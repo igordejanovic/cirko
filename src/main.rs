@@ -5,6 +5,12 @@ use cirko::{cyr_to_lat, lat_to_cir};
 
 fn main() -> io::Result<()> {
     let matches = Command::new("ћирко")
+        .disable_help_flag(true)
+        .arg(Arg::new("help")
+             .short('h')  // Остављамо -h због компатибилности
+             .long("помоћ")
+             .help("Прикажи помоћ")
+             .action(clap::ArgAction::Help))
         .about("Ћирко - конвертор српске латинице у ћирилицу и обрнуто.")
         .arg(Arg::new("улаз")
              .short('у')
