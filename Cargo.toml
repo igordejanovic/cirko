@@ -1,0 +1,12 @@
+[package]
+name = "cirko"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "ћирко"
+path = "src/main.rs"
+
+[dependencies]
+clap = "4.5.41"
+phf = { version = "0.12.1", features = ["macros"] }
