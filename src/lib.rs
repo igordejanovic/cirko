@@ -1,4 +1,6 @@
+use once_cell::sync::Lazy;
 use phf::{phf_map, phf_set};
+use regex::Regex;
 
 static CYR_TO_LAT: phf::Map<char, &'static str> = phf_map! {
     'а' => "a",
@@ -85,6 +87,22 @@ static EXCEPTIONS: phf::Set<&'static str> = phf_set! {
 // Дужина најдужег изузетка
 const MAX_EXCEPTION_LEN: usize = 9;
 
+// Регуларни изрази за делове текста који не би смели да се пресловљавају.
+static SKIP_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
+    // Напомена: сваки израз започети са ^ јер желимо подударање на текућој локацији
+    vec![
+        // Веб адресе
+        Regex::new(
+            r"^(https?://)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)",
+        )
+        .unwrap(),
+        // електронска пошта
+        Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}").unwrap(),
+        // Хештагови
+        Regex::new(r"^#\w+").unwrap(),
+    ]
+});
+
 /// Конвертује дато ћирилично слово у латинични еквивалент
 fn cyr_to_lat_char(c: char) -> Option<&'static str> {
     CYR_TO_LAT.get(&c).copied()
@@ -93,9 +111,18 @@ fn cyr_to_lat_char(c: char) -> Option<&'static str> {
 /// Конверзија српске ћирилице на латиницу
 pub fn cyr_to_lat(input: &str) -> String {
     let mut output = String::with_capacity(input.len() * 2); // Латинични облик може бити већи
-    let mut chars = input.chars().peekable();
+    let mut chars = input.char_indices().peekable();
 
-    while let Some(c) = chars.next() {
+    while let Some((pos, c)) = chars.next() {
+        if let Some(skip_len) = find_skip_match(&input[pos..]) {
+            // Преузимамо текст који се прескаче без промене
+            output.push_str(&input[pos..pos + skip_len]);
+            // Прескачемо skip_len-1 јер смо већ конзумирали једно слово
+            for _ in 0..skip_len - 1 {
+                chars.next();
+            }
+            continue;
+        }
         let is_upper = c.is_uppercase();
         let c_low = c.to_lowercase().next().unwrap();
         match cyr_to_lat_char(c_low) {
@@ -107,12 +134,12 @@ pub fn cyr_to_lat(input: &str) -> String {
                     // ће увек бити велико.
                     output.push_str(&converted_chars[0].to_uppercase().collect::<String>());
                 } else {
-                   output.push(converted_chars[0])
+                    output.push(converted_chars[0])
                 }
 
                 // Ако је двословна секвенца
                 if converted_chars.len() > 1 {
-                    if let Some(&c_next) = chars.peek() {
+                    if let Some((_, c_next)) = chars.peek() {
                         if c_next.is_uppercase() {
                             // Ако је ћирилично слово које следи велико тада ће
                             // и друго слово латинице бити велико
@@ -122,7 +149,7 @@ pub fn cyr_to_lat(input: &str) -> String {
                     }
                     output.push(converted_chars[1]);
                 }
-            },
+            }
             None => output.push(c), // Ако није српска ћирилица не конвертуј,
         }
     }
@@ -130,12 +157,23 @@ pub fn cyr_to_lat(input: &str) -> String {
 }
 
 /// Конверзија српске латинице на ћирилицу
-pub fn lat_to_cir(input: &str) -> String {
+pub fn lat_to_cyr(input: &str) -> String {
     let mut output = String::with_capacity(input.len());
     let mut chars = input.char_indices().peekable();
     let mut skip_until = 0; // Колико карактера да прескочимо до следеће провере изузетака
 
     while let Some((pos, c)) = chars.next() {
+        if let Some(skip_len) = find_skip_match(&input[pos..]) {
+            dbg!(skip_len);
+            // Преузимамо текст који се прескаче без промене
+            output.push_str(&input[pos..pos + skip_len]);
+            // Прескачемо skip_len-1 јер смо већ конзумирали једно слово
+            for _ in 0..skip_len - 1 {
+                chars.next();
+            }
+            continue;
+        }
+
         // Ако смо већ нашли изузетак радимо нормалну карактер-по-карактер транслацију
         // за дужину изузетка.
         if pos < skip_until {
@@ -149,7 +187,7 @@ pub fn lat_to_cir(input: &str) -> String {
         let mut found_exception = None;
 
         for len in (1..=check_len).rev() {
-            if let Some(substr) = input.get(pos..pos+len) {
+            if let Some(substr) = input.get(pos..pos + len) {
                 if EXCEPTIONS.contains(substr.to_lowercase().as_str()) {
                     found_exception = Some(len);
                     break;
@@ -209,6 +247,14 @@ fn process_char(
     }
 }
 
+/// Користи листу регуларних израза за прескакање за детекцију делова текста
+/// који се не обрађују. Враћа дужину ако је такав сегмент пронађен.
+fn find_skip_match(input: &str) -> Option<usize> {
+    SKIP_PATTERNS
+        .iter()
+        .find_map(|re| re.find(input))
+        .map(|m| m.end())
+}
 
 #[cfg(test)]
 mod tests {
@@ -236,27 +282,53 @@ mod tests {
     }
 
     #[test]
-    fn test_lat_to_cir() {
+    fn test_lat_to_cyr() {
         assert_eq!(
             "Чича Ђура жваће шљиве, његова ћерка Љиља једе џем",
-            lat_to_cir("Čiča Đura žvaće šljive, njegova ćerka Ljilja jede džem")
+            lat_to_cyr("Čiča Đura žvaće šljive, njegova ćerka Ljilja jede džem")
         );
         assert_eq!(
             "Чоканчићем ћу те, чоканчићем ћеш ме!!",
-            lat_to_cir("Čokančićem ću te, čokančićem ćeš me!!")
+            lat_to_cyr("Čokančićem ću te, čokančićem ćeš me!!")
         );
-        assert_eq!("Његош", lat_to_cir("Njegoš"));
-        assert_eq!("шкафишкафњак", lat_to_cir("škafiškafnjak"));
+        assert_eq!("Његош", lat_to_cyr("Njegoš"));
+        assert_eq!("шкафишкафњак", lat_to_cyr("škafiškafnjak"));
 
         // Провера конверзије двословних секвенци у контексту различите величине слова
-        assert_eq!("Џак Љубави", lat_to_cir("Džak Ljubavi"));
-        assert_eq!("Џак ЉУБАВИ", lat_to_cir("Džak LJUBAVI"));
+        assert_eq!("Џак Љубави", lat_to_cyr("Džak Ljubavi"));
+        assert_eq!("Џак ЉУБАВИ", lat_to_cyr("Džak LJUBAVI"));
 
         // Провера конверзије осталих карактера (без конверзије)
-        assert_eq!("1 2 3 чоколада", lat_to_cir("1 2 3 čokolada"));
+        assert_eq!("1 2 3 чоколада", lat_to_cyr("1 2 3 čokolada"));
 
         // Тестирање изузетака
-        assert_eq!("Како Танјуг јавља, ја те волим!", lat_to_cir("Kako Tanjug javlja, ja te volim!"));
-        assert_eq!("Оджубори овај поточић!", lat_to_cir("Odžubori ovaj potočić!"));
+        assert_eq!(
+            "Како Танјуг јавља, ја те волим!",
+            lat_to_cyr("Kako Tanjug javlja, ja te volim!")
+        );
+        assert_eq!(
+            "Оджубори овај поточић!",
+            lat_to_cyr("Odžubori ovaj potočić!")
+        );
+    }
+
+    #[test]
+    fn test_skip() {
+        assert_eq!(
+            "Посетите сајт https://igordejanovic.net/ за више информација.",
+            lat_to_cyr("Posetite sajt https://igordejanovic.net/ za više informacija.")
+        );
+        assert_eq!(
+            "Posetite sajt https://igordejanovic.net/ za više informacija.",
+            cyr_to_lat("Посетите сајт https://igordejanovic.net/ за више информација.")
+        );
+        assert_eq!(
+            "Можете нас контактирати на neko@negde.net #supercool #extra",
+            lat_to_cyr("Možete nas kontaktirati na neko@negde.net #supercool #extra")
+        );
+        assert_eq!(
+            "Možete nas kontaktirati na neko@negde.net #supercool #extra",
+            cyr_to_lat("Можете нас контактирати на neko@negde.net #supercool #extra")
+        );
     }
 }

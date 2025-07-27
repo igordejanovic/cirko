@@ -1,7 +1,7 @@
 use clap::{Arg, Command};
 use std::fs;
 use std::io::{self, Read};
-use cirko::{cyr_to_lat, lat_to_cir};
+use cirko::{cyr_to_lat, lat_to_cyr};
 
 fn main() -> io::Result<()> {
     let matches = Command::new("ћирко")
@@ -44,13 +44,13 @@ fn main() -> io::Result<()> {
     let output = if matches.contains_id("латиница") {
         crate::cyr_to_lat(&input)
     } else if matches.contains_id("ћирилица") {
-        crate::lat_to_cir(&input)
+        crate::lat_to_cyr(&input)
     } else {
         // Аутоматска детекција смера конверзије
         if input.chars().any(|c| ('а'..='ш').contains(&c) || ('А'..='Ш').contains(&c)) {
             crate::cyr_to_lat(&input)
         } else {
-            crate::lat_to_cir(&input)
+            crate::lat_to_cyr(&input)
         }
     };
 
