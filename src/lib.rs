@@ -119,11 +119,14 @@ pub fn cyr_to_lat(input: &str) -> String {
     let mut chars = input.char_indices().peekable();
 
     while let Some((pos, c)) = chars.next() {
-        if let Some(skip_len) = find_skip_match(&input[pos..]) {
+        if let Some(skip_bytes) = find_skip_match(&input[pos..]) {
             // Преузимамо текст који се прескаче без промене
-            output.push_str(&input[pos..pos + skip_len]);
+            let skipped = &input[pos..pos + skip_bytes];
+            output.push_str(skipped);
+
             // Прескачемо skip_len-1 јер смо већ конзумирали једно слово
-            for _ in 0..skip_len - 1 {
+            let skip_chars = skipped.chars().count();
+            for _ in 0..skip_chars - 1 {
                 chars.next();
             }
             continue;
@@ -168,11 +171,14 @@ pub fn lat_to_cyr(input: &str) -> String {
     let mut skip_until = 0; // Колико карактера да прескочимо до следеће провере изузетака
 
     while let Some((pos, c)) = chars.next() {
-        if let Some(skip_len) = find_skip_match(&input[pos..]) {
+        if let Some(skip_bytes) = find_skip_match(&input[pos..]) {
             // Преузимамо текст који се прескаче без промене
-            output.push_str(&input[pos..pos + skip_len]);
+            let skipped = &input[pos..pos + skip_bytes];
+            output.push_str(&input[pos..pos + skip_bytes]);
+
             // Прескачемо skip_len-1 јер смо већ конзумирали једно слово
-            for _ in 0..skip_len - 1 {
+            let skip_chars = skipped.chars().count();
+            for _ in 0..skip_chars - 1 {
                 chars.next();
             }
             continue;
@@ -252,7 +258,7 @@ fn process_char(
 }
 
 /// Користи листу регуларних израза за прескакање за детекцију делова текста
-/// који се не обрађују. Враћа дужину ако је такав сегмент пронађен.
+/// који се не обрађују. Враћа дужину у бајтовима ако је такав сегмент пронађен.
 fn find_skip_match(input: &str) -> Option<usize> {
     SKIP_PATTERNS
         .iter()
@@ -352,7 +358,7 @@ mod tests {
             \end{itemize}
             "#,
             lat_to_cyr(
-            r#"
+                r#"
             \begin{itemize}
                 \tightlist
                 \item Testiranje LaTeX okruženja.
@@ -361,5 +367,13 @@ mod tests {
             "#
             )
         );
+    }
+
+    #[test]
+    fn test_skip_chars_count() {
+        assert_eq!(
+            "Проба \\ljuljaška калкулације \\šibica офсета код прескакања",
+            lat_to_cyr("Proba \\ljuljaška kalkulacije \\šibica ofseta код прескакања")
+        )
     }
 }
