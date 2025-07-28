@@ -169,7 +169,6 @@ pub fn lat_to_cyr(input: &str) -> String {
 
     while let Some((pos, c)) = chars.next() {
         if let Some(skip_len) = find_skip_match(&input[pos..]) {
-            dbg!(skip_len);
             // Преузимамо текст који се прескаче без промене
             output.push_str(&input[pos..pos + skip_len]);
             // Прескачемо skip_len-1 јер смо већ конзумирали једно слово
