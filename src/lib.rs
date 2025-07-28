@@ -100,6 +100,11 @@ static SKIP_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}").unwrap(),
         // Хештагови
         Regex::new(r"^#\w+").unwrap(),
+        // LaTeX
+        Regex::new(r"^\\begin\{\w+\}").unwrap(),
+        Regex::new(r"^\\end\{\w+\}").unwrap(),
+        Regex::new(r"^\\\w+").unwrap(),
+        Regex::new(r"^\$[^$]*\$").unwrap(),
     ]
 });
 
@@ -313,7 +318,7 @@ mod tests {
     }
 
     #[test]
-    fn test_skip() {
+    fn test_skip_web() {
         assert_eq!(
             "Посетите сајт https://igordejanovic.net/ за више информација.",
             lat_to_cyr("Posetite sajt https://igordejanovic.net/ za više informacija.")
@@ -322,6 +327,10 @@ mod tests {
             "Posetite sajt https://igordejanovic.net/ za više informacija.",
             cyr_to_lat("Посетите сајт https://igordejanovic.net/ за више информација.")
         );
+    }
+
+    #[test]
+    fn test_skip_email() {
         assert_eq!(
             "Можете нас контактирати на neko@negde.net #supercool #extra",
             lat_to_cyr("Možete nas kontaktirati na neko@negde.net #supercool #extra")
@@ -329,6 +338,29 @@ mod tests {
         assert_eq!(
             "Možete nas kontaktirati na neko@negde.net #supercool #extra",
             cyr_to_lat("Можете нас контактирати на neko@negde.net #supercool #extra")
+        );
+    }
+
+    #[test]
+    fn test_skip_latex() {
+        // LaTeX
+        assert_eq!(
+            r#"
+            \begin{itemize}
+                \tightlist
+                \item Тестирање ЛаТеX окружења.
+                \item Мало инлајн математике - $E=mc^2$.
+            \end{itemize}
+            "#,
+            lat_to_cyr(
+            r#"
+            \begin{itemize}
+                \tightlist
+                \item Testiranje LaTeX okruženja.
+                \item Malo inlajn matematike - $E=mc^2$.
+            \end{itemize}
+            "#
+            )
         );
     }
 }
