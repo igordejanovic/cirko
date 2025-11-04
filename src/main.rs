@@ -57,7 +57,7 @@ fn main() -> io::Result<()> {
     if let Some(file) = matches.get_one::<String>("излаз") {
         fs::write(file, output)?;
     } else {
-        println!("{}", output);
+        print!("{}", output);
     }
 
     Ok(())
