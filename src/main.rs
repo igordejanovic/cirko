@@ -25,11 +25,13 @@ fn main() -> io::Result<()> {
         .arg(Arg::new("латиница")
              .short('л')
              .long("латиница")
-             .help("Конвертуј у латиницу"))
+             .help("Конвертуј у латиницу")
+             .action(clap::ArgAction::SetTrue))
         .arg(Arg::new("ћирилица")
              .short('ћ')
              .long("ћирилица")
-             .help("Конвертуј у ћирилицу"))
+             .help("Конвертуј у ћирилицу")
+             .action(clap::ArgAction::SetTrue))
         .get_matches();
 
     let input = if let Some(file) = matches.get_one::<String>("улаз") {
@@ -41,9 +43,9 @@ fn main() -> io::Result<()> {
     };
 
     // Смер конерзије се може задати опцијама команде
-    let output = if matches.contains_id("латиница") {
+    let output = if matches.get_flag("латиница") {
         crate::cyr_to_lat(&input)
-    } else if matches.contains_id("ћирилица") {
+    } else if matches.get_flag("ћирилица") {
         crate::lat_to_cyr(&input)
     } else {
         // Аутоматска детекција смера конверзије
